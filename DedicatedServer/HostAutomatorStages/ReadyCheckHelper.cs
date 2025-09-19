@@ -2,7 +2,9 @@
 using StardewValley;
 using StardewValley.Locations;
 using StardewValley.Network;
+using StardewValley.Network.NetReady;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,29 +13,41 @@ namespace DedicatedServer.HostAutomatorStages
 {
     internal class ReadyCheckHelper
     {
-        private static Assembly assembly = typeof(Game1).Assembly;
-        private static Type readyCheckType = assembly.GetType("StardewValley.ReadyCheck");
-        private static Type netRefType = typeof(NetRef<>);
-        private static Type readyCheckNetRefType = netRefType.MakeGenericType(readyCheckType);
-        private static Type netStringDictionaryType = typeof(NetStringDictionary<,>);
-        private static Type readyCheckDictionaryType = netStringDictionaryType.MakeGenericType(readyCheckType, readyCheckNetRefType);
-
-        private static FieldInfo readyChecksFieldInfo = typeof(FarmerTeam).GetField("readyChecks", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static object readyChecks = null;
-
-        private static MethodInfo readyChecksAddMethodInfo = readyCheckDictionaryType.GetMethod("Add", new Type[] { typeof(string), readyCheckType });
-        private static PropertyInfo readyChecksItemPropertyInfo = readyCheckDictionaryType.GetProperty("Item");
-
-        private static FieldInfo readyPlayersFieldInfo = readyCheckType.GetField("readyPlayers", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static Dictionary<string, NetFarmerCollection> readyPlayersDictionary = new Dictionary<string, NetFarmerCollection>();
+        // 使用 Stardew Valley 1.6 的新 API
+        private static readonly MethodInfo getIfExistsMethod;
+        private static readonly FieldInfo readyStatesField;
+        
+        // 用于兼容性的缓存
+        private static Dictionary<string, HashSet<long>> cachedReadyPlayers = new Dictionary<string, HashSet<long>>();
+        
+        static ReadyCheckHelper()
+        {
+            try
+            {
+                // 获取 ReadySynchronizer 的内部方法
+                getIfExistsMethod = typeof(ReadySynchronizer).GetMethod("GetIfExists", BindingFlags.Instance | BindingFlags.NonPublic);
+                
+                // 获取 ServerReadyCheck 的 ReadyStates 字段
+                readyStatesField = Assembly
+                    .LoadFrom("Stardew Valley.dll")
+                    .GetType("StardewValley.Network.NetReady.Internal.ServerReadyCheck")
+                    ?.GetField("ReadyStates", BindingFlags.Instance | BindingFlags.NonPublic);
+                
+                if (getIfExistsMethod == null || readyStatesField == null)
+                {
+                    throw new InvalidOperationException("无法找到 ReadySynchronizer 的内部方法或字段");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"初始化 ReadyCheckHelper 失败: {ex.Message}", ex);
+            }
+        }
 
         public static void OnDayStarted(object sender, StardewModdingAPI.Events.DayStartedEventArgs e)
         {
-            if (readyChecks == null)
-            {
-                readyChecks = readyChecksFieldInfo.GetValue(Game1.player.team);
-            }
+            // 清理前一天的缓存数据
+            cachedReadyPlayers.Clear();
 
             //Checking mailbox sometimes gives some gold, but it's compulsory to unlock some events
             for (int i = 0; i < 10; ++i) {
@@ -51,158 +65,119 @@ namespace DedicatedServer.HostAutomatorStages
                 Game1.player.HouseUpgradeLevel = targetLevel;
                 Game1.player.performRenovation("FarmHouse");
             }
-            
-
-            Dictionary<string, NetFarmerCollection> newReadyPlayersDictionary = new Dictionary<string, NetFarmerCollection>();
-            foreach (var checkName in readyPlayersDictionary.Keys)
-            {
-                object readyCheck = null;
-                try
-                {
-                    readyCheck = Activator.CreateInstance(readyCheckType, new object[] { checkName });
-                    readyChecksAddMethodInfo.Invoke(readyChecks, new object[] { checkName, readyCheck });
-                }
-                catch (Exception)
-                {
-                    readyCheck = readyChecksItemPropertyInfo.GetValue(readyChecks, new object[] { checkName });
-                }
-
-                NetFarmerCollection readyPlayers = (NetFarmerCollection) readyPlayersFieldInfo.GetValue(readyCheck);
-                newReadyPlayersDictionary.Add(checkName, readyPlayers);
-            }
-            readyPlayersDictionary = newReadyPlayersDictionary;
         }
 
         public static void WatchReadyCheck(string checkName)
         {
-            readyPlayersDictionary.TryAdd(checkName, null);
+            if (!cachedReadyPlayers.ContainsKey(checkName))
+            {
+                cachedReadyPlayers[checkName] = new HashSet<long>();
+            }
         }
 
         // Prerequisite: OnDayStarted() must have been called at least once prior to this method being called.
         public static bool IsReady(string checkName, Farmer player)
         {
-            if (readyPlayersDictionary.TryGetValue(checkName, out NetFarmerCollection readyPlayers) && readyPlayers != null)
-            {
-                return readyPlayers.Contains(player);
-            }
-
-            object readyCheck = null;
             try
             {
-                readyCheck = Activator.CreateInstance(readyCheckType, new object[] { checkName });
-                readyChecksAddMethodInfo.Invoke(readyChecks, new object[] { checkName, readyCheck });
+                // 使用 Game1.netReady 获取准备状态
+                if (Game1.netReady != null)
+                {
+                    var serverReadyCheck = getIfExistsMethod?.Invoke(Game1.netReady, new object[] { checkName });
+                    if (serverReadyCheck != null)
+                    {
+                        var readyStates = (IDictionary)readyStatesField.GetValue(serverReadyCheck);
+                        if (readyStates.Contains(player.UniqueMultiplayerID))
+                        {
+                            var state = readyStates[player.UniqueMultiplayerID].ToString();
+                            return state == "Ready";
+                        }
+                    }
+                }
+                
+                // 后备方案：使用缓存
+                WatchReadyCheck(checkName);
+                if (cachedReadyPlayers.TryGetValue(checkName, out var readyIds))
+                {
+                    return readyIds.Contains(player.UniqueMultiplayerID);
+                }
             }
             catch (Exception)
             {
-                readyCheck = readyChecksItemPropertyInfo.GetValue(readyChecks, new object[] { checkName });
+                // 如果出错，使用缓存作为后备
+                WatchReadyCheck(checkName);
+                if (cachedReadyPlayers.TryGetValue(checkName, out var readyIds))
+                {
+                    return readyIds.Contains(player.UniqueMultiplayerID);
+                }
             }
 
-            readyPlayers = (NetFarmerCollection) readyPlayersFieldInfo.GetValue(readyCheck);
-            if (readyPlayersDictionary.ContainsKey(checkName))
-            {
-                readyPlayersDictionary[checkName] = readyPlayers;
-            } else
-            {
-                readyPlayersDictionary.Add(checkName , readyPlayers);
-            }
-
-            return readyPlayers.Contains(player);
+            return false;
         }
 
         // Replacement for FarmerTeam.GetNumberReady()
         public static int GetNumberReady(string checkName)
         {
-            // Ensure readyChecks is initialized
-            if (readyChecks == null)
-            {
-                readyChecks = readyChecksFieldInfo.GetValue(Game1.player.team);
-            }
-
-            // Ensure this checkName is being watched
-            WatchReadyCheck(checkName);
-
-            if (readyPlayersDictionary.TryGetValue(checkName, out NetFarmerCollection readyPlayers) && readyPlayers != null)
-            {
-                return readyPlayers.Count();
-            }
-
-            object readyCheck = null;
             try
             {
-                readyCheck = Activator.CreateInstance(readyCheckType, new object[] { checkName });
-                readyChecksAddMethodInfo.Invoke(readyChecks, new object[] { checkName, readyCheck });
+                // 优先使用新 API
+                if (Game1.netReady != null)
+                {
+                    return Game1.netReady.GetNumberReady(checkName);
+                }
             }
             catch (Exception)
             {
-                readyCheck = readyChecksItemPropertyInfo.GetValue(readyChecks, new object[] { checkName });
+                // 如果新 API 失败，使用后备方案
             }
 
-            readyPlayers = (NetFarmerCollection) readyPlayersFieldInfo.GetValue(readyCheck);
-            if (readyPlayersDictionary.ContainsKey(checkName))
+            // 后备方案：手动计算
+            WatchReadyCheck(checkName);
+            if (cachedReadyPlayers.TryGetValue(checkName, out var readyIds))
             {
-                readyPlayersDictionary[checkName] = readyPlayers;
-            } else
-            {
-                readyPlayersDictionary.Add(checkName , readyPlayers);
+                return readyIds.Count;
             }
 
-            return readyPlayers.Count();
+            return 0;
         }
 
         // Replacement for FarmerTeam.SetLocalReady()
         public static void SetLocalReady(string checkName, bool ready)
         {
-            // Ensure readyChecks is initialized
-            if (readyChecks == null)
-            {
-                readyChecks = readyChecksFieldInfo.GetValue(Game1.player.team);
-            }
-
-            // Ensure this checkName is being watched
-            WatchReadyCheck(checkName);
-
-            NetFarmerCollection readyPlayers = null;
-            
-            if (readyPlayersDictionary.TryGetValue(checkName, out readyPlayers) && readyPlayers != null)
-            {
-                if (ready && !readyPlayers.Contains(Game1.player))
-                {
-                    readyPlayers.Add(Game1.player);
-                }
-                else if (!ready && readyPlayers.Contains(Game1.player))
-                {
-                    readyPlayers.Remove(Game1.player);
-                }
-                return;
-            }
-
-            object readyCheck = null;
             try
             {
-                readyCheck = Activator.CreateInstance(readyCheckType, new object[] { checkName });
-                readyChecksAddMethodInfo.Invoke(readyChecks, new object[] { checkName, readyCheck });
+                // 优先使用新 API
+                if (Game1.netReady != null)
+                {
+                    Game1.netReady.SetLocalReady(checkName, ready);
+                    
+                    // 更新缓存以保持一致性
+                    WatchReadyCheck(checkName);
+                    if (cachedReadyPlayers.TryGetValue(checkName, out var cachedIds))
+                    {
+                        if (ready)
+                            cachedIds.Add(Game1.player.UniqueMultiplayerID);
+                        else
+                            cachedIds.Remove(Game1.player.UniqueMultiplayerID);
+                    }
+                    return;
+                }
             }
             catch (Exception)
             {
-                readyCheck = readyChecksItemPropertyInfo.GetValue(readyChecks, new object[] { checkName });
+                // 如果新 API 失败，使用后备方案
             }
 
-            readyPlayers = (NetFarmerCollection) readyPlayersFieldInfo.GetValue(readyCheck);
-            if (readyPlayersDictionary.ContainsKey(checkName))
+            // 后备方案：只更新本地缓存
+            WatchReadyCheck(checkName);
+            long playerId = Game1.player.UniqueMultiplayerID;
+            
+            if (cachedReadyPlayers.TryGetValue(checkName, out var readyIds))
             {
-                readyPlayersDictionary[checkName] = readyPlayers;
-            } else
-            {
-                readyPlayersDictionary.Add(checkName , readyPlayers);
-            }
-
-            if (ready && !readyPlayers.Contains(Game1.player))
-            {
-                readyPlayers.Add(Game1.player);
-            }
-            else if (!ready && readyPlayers.Contains(Game1.player))
-            {
-                readyPlayers.Remove(Game1.player);
+                if (ready)
+                    readyIds.Add(playerId);
+                else
+                    readyIds.Remove(playerId);
             }
         }
     }

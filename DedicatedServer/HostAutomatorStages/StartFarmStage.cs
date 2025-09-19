@@ -9,7 +9,7 @@ using StardewValley;
 using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
+using System.IO;
 
 // TODO move config value checking to the ModEntry, or another dedicated class, to be performed
 // prior to any updates / Execute() calls. Also make sure to check validity of newly added fields, like
@@ -63,11 +63,38 @@ namespace DedicatedServer.HostAutomatorStages
                 return;
             }
             
-            MethodInfo info = typeof(LoadGameMenu).GetMethod("FindSaveGames", BindingFlags.Static | BindingFlags.NonPublic);
-            object result = info.Invoke(obj: null, parameters: Array.Empty<object>());
-            List<Farmer> farmers = result as List<Farmer>;
+            // 尝试使用 SMAPI 反射 API 安全调用 FindSaveGames
+            List<Farmer> farmers = null;
+            
+            try
+            {
+                // 使用 SMAPI 的反射 API，它会自动处理参数问题
+                var findSaveGamesMethod = helper.Reflection.GetMethod(typeof(LoadGameMenu), "FindSaveGames", required: false);
+                if (findSaveGamesMethod != null)
+                {
+                    farmers = findSaveGamesMethod.Invoke<List<Farmer>>();
+                    monitor.Log($"通过 FindSaveGames 找到 {farmers?.Count ?? 0} 个存档", LogLevel.Debug);
+                }
+                else
+                {
+                    monitor.Log("FindSaveGames 方法不可用，使用备用方法", LogLevel.Debug);
+                }
+            }
+            catch (Exception ex)
+            {
+                monitor.Log($"SMAPI 反射调用 FindSaveGames 失败: {ex.Message}", LogLevel.Debug);
+            }
+            
+            // 如果 SMAPI 反射失败，使用备用方法
             if (farmers == null)
             {
+                monitor.Log("使用备用方法从文件夹读取存档", LogLevel.Debug);
+                farmers = GetSaveGamesFromFolder();
+            }
+            
+            if (farmers == null || farmers.Count == 0)
+            {
+                monitor.Log("未找到可用的存档", LogLevel.Info);
                 return;
             }
 
@@ -375,6 +402,101 @@ namespace DedicatedServer.HostAutomatorStages
             pauseCommandListener = null;
             serverCommandListener?.Disable();
             serverCommandListener = null;
+        }
+
+        /// <summary>
+        /// 备用方法：直接从存档文件夹读取存档列表
+        /// 当反射调用 LoadGameMenu.FindSaveGames 失败时使用
+        /// </summary>
+        private List<Farmer> GetSaveGamesFromFolder()
+        {
+            try
+            {
+                string savesPath = StardewModdingAPI.Constants.SavesPath;
+                monitor.Log($"从存档文件夹读取存档列表: {savesPath}", LogLevel.Debug);
+                
+                if (!Directory.Exists(savesPath))
+                {
+                    monitor.Log("存档文件夹不存在", LogLevel.Warn);
+                    return new List<Farmer>();
+                }
+
+                var farmers = new List<Farmer>();
+                var saveDirectories = Directory.GetDirectories(savesPath);
+                
+                foreach (string saveDir in saveDirectories)
+                {
+                    string saveName = Path.GetFileName(saveDir);
+                    string saveInfoPath = Path.Combine(saveDir, "SaveGameInfo");
+                    
+                    // 检查是否有 SaveGameInfo 文件
+                    if (File.Exists(saveInfoPath))
+                    {
+                        try
+                        {
+                            // 检查存档文件以确定是否可以托管
+                            // 星露谷物语存档结构：存档文件夹中有同名的主存档文件（无扩展名）
+                            string mainSaveFile = Path.Combine(saveDir, saveName);
+                            bool canHost = File.Exists(mainSaveFile); // 主存档文件必须存在才能托管
+                            
+                            // 创建 Farmer 对象
+                            var farmer = new Farmer();
+                            farmer.slotName = saveName;
+                            farmer.slotCanHost = canHost;
+                            
+                            // 从文件夹名称提取农场名称（通常格式为 "FarmName_UniqueID"）
+                            string farmName = saveName;
+                            int underscoreIndex = saveName.LastIndexOf('_');
+                            if (underscoreIndex > 0)
+                            {
+                                farmName = saveName.Substring(0, underscoreIndex);
+                            }
+                            
+                            farmer.farmName.Value = farmName;
+                            
+                            // 只添加可以托管的存档
+                            if (canHost)
+                            {
+                                farmers.Add(farmer);
+                                monitor.Log($"找到可托管存档: {farmer.farmName.Value} (槽位: {saveName})", LogLevel.Debug);
+                            }
+                            else
+                            {
+                                monitor.Log($"跳过不可托管存档: {farmName} (槽位: {saveName})", LogLevel.Debug);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            monitor.Log($"读取存档信息失败 {saveName}: {ex.Message}", LogLevel.Debug);
+                            // 读取失败时仍需检查是否可以托管
+                            string mainSaveFile = Path.Combine(saveDir, saveName);
+                            bool canHost = File.Exists(mainSaveFile);
+                            
+                            if (canHost)
+                            {
+                                var farmer = new Farmer();
+                                farmer.slotName = saveName;
+                                farmer.slotCanHost = true;
+                                farmer.farmName.Value = saveName; // 无法解析时使用完整文件夹名
+                                farmers.Add(farmer);
+                                monitor.Log($"添加存档（信息读取失败但文件存在）: {saveName}", LogLevel.Debug);
+                            }
+                            else
+                            {
+                                monitor.Log($"跳过存档（文件不存在）: {saveName}", LogLevel.Debug);
+                            }
+                        }
+                    }
+                }
+                
+                monitor.Log($"从文件夹找到 {farmers.Count} 个存档", LogLevel.Debug);
+                return farmers;
+            }
+            catch (Exception ex)
+            {
+                monitor.Log($"从存档文件夹读取失败: {ex.Message}", LogLevel.Error);
+                return new List<Farmer>();
+            }
         }
     }
 }
