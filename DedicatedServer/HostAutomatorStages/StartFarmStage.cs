@@ -1,4 +1,4 @@
-﻿using DedicatedServer.Chat;
+using DedicatedServer.Chat;
 using DedicatedServer.Config;
 using DedicatedServer.Crops;
 using DedicatedServer.MessageCommands;
@@ -94,8 +94,9 @@ namespace DedicatedServer.HostAutomatorStages
             
             if (farmers == null || farmers.Count == 0)
             {
-                monitor.Log("未找到可用的存档", LogLevel.Info);
-                return;
+                monitor.Log("未找到可用的存档，将创建新农场", LogLevel.Info);
+                // 不要提前返回，继续走下方“创建新农场并托管”的逻辑
+                farmers = new List<Farmer>();
             }
 
             Farmer hostedFarmer = null;

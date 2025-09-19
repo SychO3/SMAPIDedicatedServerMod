@@ -1,4 +1,4 @@
-﻿using DedicatedServer.Chat;
+using DedicatedServer.Chat;
 using StardewValley;
 using System;
 using System.Collections.Generic;

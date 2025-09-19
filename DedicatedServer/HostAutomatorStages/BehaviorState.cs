@@ -1,4 +1,4 @@
-﻿using DedicatedServer.Chat;
+using DedicatedServer.Chat;
 using StardewModdingAPI;
 using StardewValley;
 using System;
