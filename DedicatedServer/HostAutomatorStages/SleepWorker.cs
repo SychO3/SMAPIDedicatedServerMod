@@ -45,7 +45,7 @@ namespace DedicatedServer.HostAutomatorStages
         /// </returns>
         public static bool OthersInBed(int numOtherPlayers)
         {
-            return Game1.player.team.GetNumberReady("sleep") == (numOtherPlayers + (IsSleeping() ? 1 : 0));
+            return ReadyCheckHelper.GetNumberReady("sleep") == (numOtherPlayers + (IsSleeping() ? 1 : 0));
         }
 
         /// <summary>

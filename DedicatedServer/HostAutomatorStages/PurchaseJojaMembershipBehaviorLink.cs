@@ -21,7 +21,7 @@ namespace DedicatedServer.HostAutomatorStages
             {
                 // Then purchase it
                 Game1.addMailForTomorrow("JojaMember", noLetter: true, sendToEveryone: true);
-                Game1.player.removeQuest(26);
+                Game1.player.removeQuest("26");
             }
             else
             {

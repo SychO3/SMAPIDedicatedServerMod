@@ -62,7 +62,7 @@ namespace DedicatedServer.MessageCommands
                         }
                     }
 
-                    if (building.indoors.Value is Cabin && (building.indoors.Value as Cabin).farmhand.Value.isActive())
+                    if (building.indoors.Value is Cabin cabin && cabin.HasOwner && cabin.IsOwnerActivated)
                     {
                         chatBox.textBoxEnter("/message " + farmerName + " Error: " + Game1.content.LoadString("Strings\\UI:Carpenter_CantDemolish_FarmhandOnline"));
                     }
@@ -77,7 +77,11 @@ namespace DedicatedServer.MessageCommands
                             {
                                 chest = new Chest(playerChest: true);
                                 chest.fixLidFrame();
-                                chest.items.Set(list);
+                                chest.Items.Clear();
+                                foreach (Item item in list)
+                                {
+                                    chest.Items.Add(item);
+                                }
                             }
                         }
 
@@ -163,17 +167,17 @@ namespace DedicatedServer.MessageCommands
                             }
                             foreach (var building in f.buildings)
                             {
-                                if (building.occupiesTile(tileLocation))
+                                if (building.occupiesTile(new Vector2(tileLocation.X, tileLocation.Y)))
                                 {
                                     // Determine if the building can be demolished
-                                    var demolishCheckBlueprint = new BluePrint(building.buildingType.Value);
-                                    if (demolishCheckBlueprint.moneyRequired < 0)
+                                    var buildingData = building.GetData();
+                                    if (buildingData.BuildCost < 0)
                                     {
                                         // Hard-coded magic number (< 0) means it cannot be demolished
                                         chatBox.textBoxEnter("/message " + farmer.Name + " Error: This building can't be demolished.");
                                         return;
                                     }
-                                    else if (demolishCheckBlueprint.name == "Shipping Bin")
+                                    else if (buildingData.Name == "Shipping Bin")
                                     {
                                         int num = 0;
                                         foreach (var b in Game1.getFarm().buildings)
@@ -200,7 +204,7 @@ namespace DedicatedServer.MessageCommands
                                     if (building.indoors.Value is Cabin)
                                     {
                                         Cabin cabin = building.indoors.Value as Cabin;
-                                        if (cabin.farmhand.Value != null && cabin.farmhand.Value.isCustomized.Value)
+                                        if (cabin.HasOwner && cabin.IsOwnerActivated)
                                         {
                                             // The cabin is owned by someone. Ask the player if they're certain; record in memory the action to destroy the building.
                                             var responseActions = new Dictionary<string, Action>();

@@ -31,7 +31,7 @@ namespace DedicatedServer.HostAutomatorStages
                     Game1.player.isInBed.Value = true;
                     Game1.player.sleptInTemporaryBed.Value = true;
                     Game1.player.timeWentToBed.Value = Game1.timeOfDay;
-                    Game1.player.team.SetLocalReady("sleep", ready: true);
+                    ReadyCheckHelper.SetLocalReady("sleep", true);
                     Game1.dialogueUp = false;
                     Game1.activeClickableMenu = new ReadyCheckDialog("sleep", allowCancel: true, delegate
                     {
@@ -73,7 +73,7 @@ namespace DedicatedServer.HostAutomatorStages
                     {
                         rcd.closeDialog(Game1.player);
                     }
-                    Game1.player.team.SetLocalReady("sleep", false);
+                    ReadyCheckHelper.SetLocalReady("sleep", false);
                     state.CancelSleep();
                 }
             }

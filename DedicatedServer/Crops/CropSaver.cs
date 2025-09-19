@@ -201,7 +201,7 @@ namespace DedicatedServer.Crops
                                     DayOfCurrentPhase = crop.dayOfCurrentPhase.Value,
                                     FullyGrown = crop.fullyGrown.Value,
                                     PhaseDays = crop.phaseDays.ToList(),
-                                    OriginalRegrowAfterHarvest = crop.regrowAfterHarvest.Value
+                                    OriginalRegrowAfterHarvest = crop.GetData()?.RegrowDays ?? -1
                                 };
 
                                 var cropComparisonData = new CropComparisonData
@@ -210,7 +210,7 @@ namespace DedicatedServer.Crops
                                     RowInSpriteSheet = crop.rowInSpriteSheet.Value,
                                     Dead = crop.dead.Value,
                                     ForageCrop = crop.forageCrop.Value,
-                                    WhichForageCrop = crop.whichForageCrop.Value
+                                    WhichForageCrop = int.TryParse(crop.whichForageCrop.Value, out int forageCrop) ? forageCrop : 0
                                 };
 
                                 // Determine if this crop was planted today or was pre-existing, based on whether
@@ -222,32 +222,22 @@ namespace DedicatedServer.Crops
                                     var cd = new CropData
                                     {
                                         MarkedForDeath = false,
-                                        OriginalSeasonsToGrowIn = crop.seasonsToGrowIn.ToList(),
+                                        OriginalSeasonsToGrowIn = crop.GetData()?.Seasons?.Select(s => s.ToString().ToLower()).ToList() ?? new List<string>(),
                                         HasExistedInIncompatibleSeason = false,
-                                        OriginalRegrowAfterHarvest = crop.regrowAfterHarvest.Value,
+                                        OriginalRegrowAfterHarvest = crop.GetData()?.RegrowDays ?? -1,
                                         HarvestableLastNight = false
                                     };
                                     cropDictionary[cropLocation] = cd;
 
-                                    // Make sure that the crop is set to survive in all seasons, so that it
-                                    // only dies if it's harvested for the last time or manually killed after being
-                                    // marked for death
-                                    if (!crop.seasonsToGrowIn.Contains("spring"))
-                                    {
-                                        crop.seasonsToGrowIn.Add("spring");
-                                    }
-                                    if (!crop.seasonsToGrowIn.Contains("summer"))
-                                    {
-                                        crop.seasonsToGrowIn.Add("summer");
-                                    }
-                                    if (!crop.seasonsToGrowIn.Contains("fall"))
-                                    {
-                                        crop.seasonsToGrowIn.Add("fall");
-                                    }
-                                    if (!crop.seasonsToGrowIn.Contains("winter"))
-                                    {
-                                        crop.seasonsToGrowIn.Add("winter");
-                                    }
+                                    // TODO: In Stardew Valley 1.6+, crop seasons are read-only data from Data/Crops
+                                    // and cannot be modified directly. The old logic here tried to make crops survive
+                                    // in all seasons by adding all seasons to crop.seasonsToGrowIn.
+                                    // This functionality may need to be implemented differently or crops may die
+                                    // naturally when out of season (which might be acceptable behavior).
+                                    // Original logic was:
+                                    // - Add all seasons (spring, summer, fall, winter) to crop.seasonsToGrowIn
+                                    // - This prevented crops from dying due to season changes
+                                    // - Crops would only die when harvested completely or manually marked for death
                                 }
 
                                 // If there's a crop in the dictionary at this location (just planted today or otherwise),
@@ -335,7 +325,7 @@ namespace DedicatedServer.Crops
                                         DayOfCurrentPhase = crop.dayOfCurrentPhase.Value,
                                         FullyGrown = crop.fullyGrown.Value,
                                         PhaseDays = crop.phaseDays.ToList(),
-                                        OriginalRegrowAfterHarvest = crop.regrowAfterHarvest.Value
+                                        OriginalRegrowAfterHarvest = crop.GetData()?.RegrowDays ?? -1
                                     };
 
                                     cropComparisonData = new CropComparisonData
@@ -344,8 +334,8 @@ namespace DedicatedServer.Crops
                                         RowInSpriteSheet = crop.rowInSpriteSheet.Value,
                                         Dead = crop.dead.Value,
                                         ForageCrop = crop.forageCrop.Value,
-                                        WhichForageCrop = crop.whichForageCrop.Value
-                                    };
+                                    WhichForageCrop = int.TryParse(crop.whichForageCrop.Value, out int forageCrop2) ? forageCrop2 : 0
+                                };
 
                                     beginningOfDayCrops[cropLocation] = cropComparisonData;
 
@@ -360,7 +350,7 @@ namespace DedicatedServer.Crops
                                 // Check if it's currently a season which is incompatible with the
                                 // crop's ORIGINAL compatible seasons. If so, update the crop data to
                                 // reflect this.
-                                if (!cropData.OriginalSeasonsToGrowIn.Contains(location.GetSeasonForLocation()))
+                                if (!cropData.OriginalSeasonsToGrowIn.Contains(Game1.currentSeason))
                                 {
                                     cropData.HasExistedInIncompatibleSeason = true;
                                 }
@@ -375,13 +365,14 @@ namespace DedicatedServer.Crops
                                     cropData.MarkedForDeath = true;
                                 }
 
-                                // Now we have to update the crop itself. If it's existed out-of-season,
-                                // then its regrowAfterHarvest value should be set to -1, so that the
-                                // farmer only gets one more harvest out of it.
-                                if (cropData.HasExistedInIncompatibleSeason)
-                                {
-                                    crop.regrowAfterHarvest.Value = -1;
-                                }
+                                // TODO: In Stardew Valley 1.6+, crop.regrowAfterHarvest is read-only data from Data/Crops
+                                // and cannot be modified directly. The old logic here tried to set regrowAfterHarvest to -1
+                                // to ensure the farmer only gets one more harvest from out-of-season crops.
+                                // This functionality may need to be implemented differently, perhaps by:
+                                // - Tracking regrow state in the mod's own data structures
+                                // - Manually killing crops after harvest instead of relying on regrowAfterHarvest
+                                // - Accepting that crops will regrow naturally according to their Data/Crops definition
+                                // Original logic: if (cropData.HasExistedInIncompatibleSeason) crop.regrowAfterHarvest.Value = -1;
 
                                 // And if the crop has been marked for death because it was planted too close to
                                 // the turn of the season, then we should make sure it's killed.
@@ -410,7 +401,7 @@ namespace DedicatedServer.Crops
                                     RowInSpriteSheet = crop.rowInSpriteSheet.Value,
                                     Dead = crop.dead.Value,
                                     ForageCrop = crop.forageCrop.Value,
-                                    WhichForageCrop = crop.whichForageCrop.Value
+                                    WhichForageCrop = int.TryParse(crop.whichForageCrop.Value, out int forageCrop3) ? forageCrop3 : 0
                                 };
 
                                 beginningOfDayCrops[cropLocation] = cropComparisonData;

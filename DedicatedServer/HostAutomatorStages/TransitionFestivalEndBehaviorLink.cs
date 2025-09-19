@@ -25,7 +25,7 @@ namespace DedicatedServer.HostAutomatorStages
                     state.DecrementBetweenTransitionFestivalEndWaitTicks();
                 } else
                 {
-                    Game1.player.team.SetLocalReady("festivalEnd", ready: true);
+                    ReadyCheckHelper.SetLocalReady("festivalEnd", true);
                     Game1.activeClickableMenu = new ReadyCheckDialog("festivalEnd", allowCancel: true, delegate (Farmer who)
                     {
                         Game1.currentLocation.currentEvent.forceEndFestival(who);
@@ -44,7 +44,7 @@ namespace DedicatedServer.HostAutomatorStages
                     {
                         rcd.closeDialog(Game1.player);
                     }
-                    Game1.player.team.SetLocalReady("festivalEnd", false);
+                    ReadyCheckHelper.SetLocalReady("festivalEnd", false);
                     state.StopWaitingForFestivalEnd();
                 }
             }

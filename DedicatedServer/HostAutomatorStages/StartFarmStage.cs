@@ -176,11 +176,11 @@ namespace DedicatedServer.HostAutomatorStages
                 }
                 if (config.PetSpecies == "cat")
                 {
-                    Game1.player.catPerson = true;
+                    Game1.player.whichPetType = "Cat";
                 }
                 else
                 {
-                    Game1.player.catPerson = false;
+                    Game1.player.whichPetType = "Dog";
                 }
 
                 // Pet breed
@@ -195,10 +195,10 @@ namespace DedicatedServer.HostAutomatorStages
                 }
                 if (config.PetBreed.HasValue)
                 {
-                    Game1.player.whichPetBreed = config.PetBreed.Value;
+                    Game1.player.whichPetBreed = config.PetBreed.ToString();
                 } else
                 {
-                    Game1.player.whichPetBreed = 0;
+                    Game1.player.whichPetBreed = "0";
                 }
 
                 // Farm type
@@ -304,7 +304,7 @@ namespace DedicatedServer.HostAutomatorStages
             // update the value dynamically, and load new cellars whenever a new player
             // joins? Unclear...
             //Game1.netWorldState.Value.HighestPlayerLimit.Value = int.MaxValue;
-            Game1.netWorldState.Value.CurrentPlayerLimit.Value = int.MaxValue;
+            Game1.netWorldState.Value.CurrentPlayerLimit = int.MaxValue;
             // NOTE: It will be very difficult, if not impossible, to remove the
             // cabin-per-player requirement. This requirement is very much built in
             // to much of the multiplayer networking connect / disconnect logic, and,
@@ -333,7 +333,13 @@ namespace DedicatedServer.HostAutomatorStages
             chatBox.textBoxEnter("/mbp " + config.MoveBuildPermission);
 
             //We set bot mining lvl to 10 so he doesn't lvlup passively
-            Game1.player.MiningLevel = 10;
+            // Level 10 mining requires 15000 experience points total
+            int requiredXP = 15000;
+            int currentXP = Game1.player.experiencePoints[Farmer.miningSkill];
+            if (currentXP < requiredXP)
+            {
+                Game1.player.gainExperience(Farmer.miningSkill, requiredXP - currentXP);
+            }
 
             automatedHost = new AutomatedHost(helper, monitor, config, chatBox);
             automatedHost.Enable();

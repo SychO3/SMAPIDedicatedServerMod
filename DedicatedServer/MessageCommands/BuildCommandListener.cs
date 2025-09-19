@@ -1,6 +1,7 @@
 ﻿using DedicatedServer.Chat;
 using Microsoft.Xna.Framework;
 using StardewValley;
+using StardewValley.Buildings;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,31 +32,32 @@ namespace DedicatedServer.MessageCommands
             void buildCabin(EventDrivenChatBox chatBox, Farmer farmer)
             {
                 var point = new Microsoft.Xna.Framework.Point((int)Math.Floor(farmer.Position.X / Game1.tileSize), (int)Math.Floor(farmer.Position.Y / Game1.tileSize));
-                var blueprint = new BluePrint(cabinBlueprintName);
+                var tempBuilding = Building.CreateInstanceFromId(cabinBlueprintName, Vector2.Zero);
+                var buildingData = tempBuilding.GetData();
                 switch (farmer.facingDirection.Value)
                 {
                     case 1: // Right
                         point.X++;
-                        point.Y -= (blueprint.tilesHeight / 2);
+                        point.Y -= (buildingData.Size.Y / 2);
                         break;
                     case 2: // Down
-                        point.X -= (blueprint.tilesWidth / 2);
+                        point.X -= (buildingData.Size.X / 2);
                         point.Y++;
                         break;
                     case 3: // Left
-                        point.X -= blueprint.tilesWidth;
-                        point.Y -= (blueprint.tilesHeight / 2);
+                        point.X -= buildingData.Size.X;
+                        point.Y -= (buildingData.Size.Y / 2);
                         break;
                     default: // 0 = Up
-                        point.X -= (blueprint.tilesWidth / 2);
-                        point.Y -= blueprint.tilesHeight;
+                        point.X -= (buildingData.Size.X / 2);
+                        point.Y -= buildingData.Size.Y;
                         break;
                 }
                 Game1.player.team.buildLock.RequestLock(delegate
                 {
                     if (Game1.locationRequest == null)
                     {
-                        var res = ((Farm)Game1.getLocationFromName("Farm")).buildStructure(blueprint, new Vector2(point.X, point.Y), Game1.player, false);
+                        var res = ((Farm)Game1.getLocationFromName("Farm")).buildStructure(tempBuilding, new Vector2(point.X, point.Y), Game1.player, false);
                         if (res)
                         {
                             chatBox.textBoxEnter(farmer.Name + " just built a " + cabinBlueprintName);

@@ -42,7 +42,7 @@ namespace DedicatedServer.HostAutomatorStages
 
             //Unlocks the sewer
             if (!Game1.player.eventsSeen.Contains("295672") && Game1.netWorldState.Value.MuseumPieces.Count() >= 60) {
-                Game1.player.eventsSeen.Add(295672);
+                Game1.player.eventsSeen.Add("295672");
             }
 
             //Upgrade farmhouse to match highest level cabin
@@ -107,6 +107,103 @@ namespace DedicatedServer.HostAutomatorStages
             }
 
             return readyPlayers.Contains(player);
+        }
+
+        // Replacement for FarmerTeam.GetNumberReady()
+        public static int GetNumberReady(string checkName)
+        {
+            // Ensure readyChecks is initialized
+            if (readyChecks == null)
+            {
+                readyChecks = readyChecksFieldInfo.GetValue(Game1.player.team);
+            }
+
+            // Ensure this checkName is being watched
+            WatchReadyCheck(checkName);
+
+            if (readyPlayersDictionary.TryGetValue(checkName, out NetFarmerCollection readyPlayers) && readyPlayers != null)
+            {
+                return readyPlayers.Count();
+            }
+
+            object readyCheck = null;
+            try
+            {
+                readyCheck = Activator.CreateInstance(readyCheckType, new object[] { checkName });
+                readyChecksAddMethodInfo.Invoke(readyChecks, new object[] { checkName, readyCheck });
+            }
+            catch (Exception)
+            {
+                readyCheck = readyChecksItemPropertyInfo.GetValue(readyChecks, new object[] { checkName });
+            }
+
+            readyPlayers = (NetFarmerCollection) readyPlayersFieldInfo.GetValue(readyCheck);
+            if (readyPlayersDictionary.ContainsKey(checkName))
+            {
+                readyPlayersDictionary[checkName] = readyPlayers;
+            } else
+            {
+                readyPlayersDictionary.Add(checkName , readyPlayers);
+            }
+
+            return readyPlayers.Count();
+        }
+
+        // Replacement for FarmerTeam.SetLocalReady()
+        public static void SetLocalReady(string checkName, bool ready)
+        {
+            // Ensure readyChecks is initialized
+            if (readyChecks == null)
+            {
+                readyChecks = readyChecksFieldInfo.GetValue(Game1.player.team);
+            }
+
+            // Ensure this checkName is being watched
+            WatchReadyCheck(checkName);
+
+            NetFarmerCollection readyPlayers = null;
+            
+            if (readyPlayersDictionary.TryGetValue(checkName, out readyPlayers) && readyPlayers != null)
+            {
+                if (ready && !readyPlayers.Contains(Game1.player))
+                {
+                    readyPlayers.Add(Game1.player);
+                }
+                else if (!ready && readyPlayers.Contains(Game1.player))
+                {
+                    readyPlayers.Remove(Game1.player);
+                }
+                return;
+            }
+
+            object readyCheck = null;
+            try
+            {
+                readyCheck = Activator.CreateInstance(readyCheckType, new object[] { checkName });
+                readyChecksAddMethodInfo.Invoke(readyChecks, new object[] { checkName, readyCheck });
+            }
+            catch (Exception)
+            {
+                readyCheck = readyChecksItemPropertyInfo.GetValue(readyChecks, new object[] { checkName });
+            }
+
+            readyPlayers = (NetFarmerCollection) readyPlayersFieldInfo.GetValue(readyCheck);
+            if (readyPlayersDictionary.ContainsKey(checkName))
+            {
+                readyPlayersDictionary[checkName] = readyPlayers;
+            } else
+            {
+                readyPlayersDictionary.Add(checkName , readyPlayers);
+            }
+
+            if (ready && !readyPlayers.Contains(Game1.player))
+            {
+                readyPlayers.Add(Game1.player);
+            }
+            else if (!ready && readyPlayers.Contains(Game1.player))
+            {
+                readyPlayers.Remove(Game1.player);
+            }
         }
     }
 }

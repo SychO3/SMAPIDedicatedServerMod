@@ -25,7 +25,7 @@ namespace DedicatedServer.Utils
         }
         public static bool OthersWaitingToAttend(int numOtherPlayers)
         {
-            return Game1.player.team.GetNumberReady("festivalStart") == (numOtherPlayers + (IsWaitingToAttend() ? 1 : 0));
+            return HostAutomatorStages.ReadyCheckHelper.GetNumberReady("festivalStart") == (numOtherPlayers + (IsWaitingToAttend() ? 1 : 0));
         }
         private static bool isTodayBeachNightMarket()
         {
@@ -42,7 +42,7 @@ namespace DedicatedServer.Utils
         }
         public static bool OthersWaitingToLeave(int numOtherPlayers)
         {
-            return Game1.player.team.GetNumberReady("festivalEnd") == (numOtherPlayers + (IsWaitingToLeave() ? 1 : 0));
+            return HostAutomatorStages.ReadyCheckHelper.GetNumberReady("festivalEnd") == (numOtherPlayers + (IsWaitingToLeave() ? 1 : 0));
         }
         public static bool ShouldLeave(int numOtherPlayers)
         {
