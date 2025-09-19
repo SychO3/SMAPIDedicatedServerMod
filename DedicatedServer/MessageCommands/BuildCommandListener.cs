@@ -30,7 +30,7 @@ namespace DedicatedServer.MessageCommands
         {
             void buildCabin(EventDrivenChatBox chatBox, Farmer farmer)
             {
-                var point = farmer.getTileLocation();
+                var point = new Microsoft.Xna.Framework.Point((int)Math.Floor(farmer.Position.X / Game1.tileSize), (int)Math.Floor(farmer.Position.Y / Game1.tileSize));
                 var blueprint = new BluePrint(cabinBlueprintName);
                 switch (farmer.facingDirection.Value)
                 {

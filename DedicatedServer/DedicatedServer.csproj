@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <EnableHarmony>true</EnableHarmony>
     <GamePath Condition=" '$(GamePath)' != '' ">$(GamePath)</GamePath>
-    <ModFolderName>MultiplayerAssistant</ModFolderName>
+    <ModFolderName>DedicatedServer</ModFolderName>
     <ModZipPath>$(ProjectDir)..</ModZipPath>
   </PropertyGroup>
 

@@ -18,7 +18,6 @@ using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using static StardewValley.Polygon;
 using static System.Collections.Specialized.BitVector32;
 
 namespace DedicatedServer.Utils

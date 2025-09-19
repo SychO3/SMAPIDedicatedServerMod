@@ -41,7 +41,7 @@ namespace DedicatedServer.HostAutomatorStages
             }
 
             //Unlocks the sewer
-            if (!Game1.player.eventsSeen.Contains(295672) && Game1.netWorldState.Value.MuseumPieces.Count() >= 60) {
+            if (!Game1.player.eventsSeen.Contains("295672") && Game1.netWorldState.Value.MuseumPieces.Count() >= 60) {
                 Game1.player.eventsSeen.Add(295672);
             }
 

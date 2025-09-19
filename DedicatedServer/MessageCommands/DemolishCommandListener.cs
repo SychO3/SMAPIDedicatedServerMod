@@ -145,7 +145,7 @@ namespace DedicatedServer.MessageCommands
                         var location = farmer.currentLocation;
                         if (location is Farm f)
                         {
-                            var tileLocation = farmer.getTileLocation();
+                            var tileLocation = new Microsoft.Xna.Framework.Point((int)Math.Floor(farmer.Position.X / Game1.tileSize), (int)Math.Floor(farmer.Position.Y / Game1.tileSize));
                             switch (farmer.facingDirection.Value)
                             {
                                 case 1: // Right
