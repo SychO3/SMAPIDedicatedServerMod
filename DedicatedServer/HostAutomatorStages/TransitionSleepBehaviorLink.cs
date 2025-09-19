@@ -26,7 +26,7 @@ namespace DedicatedServer.HostAutomatorStages
                 {
                     state.DecrementBetweenTransitionSleepWaitTicks();
                 }
-                else if (Game1.currentLocation is FarmHouse)
+                else if (Game1.currentLocation is FarmHouse && Game1.activeClickableMenu == null)
                 {
                     Game1.player.isInBed.Value = true;
                     Game1.player.sleptInTemporaryBed.Value = true;

@@ -6,28 +6,142 @@ using StardewValley.TerrainFeatures;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.ComponentModel;
+using System.Globalization;
 
 namespace DedicatedServer.Crops
 {
+    /// <summary>
+    /// TypeConverter for CropLocation to enable serialization/deserialization as dictionary keys
+    /// </summary>
+    public class CropLocationTypeConverter : TypeConverter
+    {
+        public override bool CanConvertFrom(ITypeDescriptorContext context, Type sourceType)
+        {
+            return sourceType == typeof(string) || base.CanConvertFrom(context, sourceType);
+        }
+
+        public override object ConvertFrom(ITypeDescriptorContext context, CultureInfo culture, object value)
+        {
+            if (value is string str && !string.IsNullOrEmpty(str))
+            {
+                return CropSaver.CropLocation.Parse(str);
+            }
+            return base.ConvertFrom(context, culture, value);
+        }
+
+        public override bool CanConvertTo(ITypeDescriptorContext context, Type destinationType)
+        {
+            return destinationType == typeof(string) || base.CanConvertTo(context, destinationType);
+        }
+
+        public override object ConvertTo(ITypeDescriptorContext context, CultureInfo culture, object value, Type destinationType)
+        {
+            if (destinationType == typeof(string) && value is CropSaver.CropLocation location)
+            {
+                return location.ToString();
+            }
+            return base.ConvertTo(context, culture, value, destinationType);
+        }
+    }
+
     public class CropSaver
     {
         private IModHelper helper;
         private IMonitor monitor;
         private ModConfig config;
-        private SerializableDictionary<CropLocation, CropData> cropDictionary = new SerializableDictionary<CropLocation, CropData>();
-        private SerializableDictionary<CropLocation, CropComparisonData> beginningOfDayCrops = new SerializableDictionary<CropLocation, CropComparisonData>();
+        private SerializableDictionary<string, CropData> cropDictionary = new SerializableDictionary<string, CropData>();
+        private SerializableDictionary<string, CropComparisonData> beginningOfDayCrops = new SerializableDictionary<string, CropComparisonData>();
 
         public class CropSaveData
         {
-            public SerializableDictionary<CropLocation, CropData> cropDictionary { get; set; } = new SerializableDictionary<CropLocation, CropData>();
-            public SerializableDictionary<CropLocation, CropComparisonData> beginningOfDayCrops { get; set; } = new SerializableDictionary<CropLocation, CropComparisonData>();
+            public SerializableDictionary<string, CropData> cropDictionary { get; set; } = new SerializableDictionary<string, CropData>();
+            public SerializableDictionary<string, CropComparisonData> beginningOfDayCrops { get; set; } = new SerializableDictionary<string, CropComparisonData>();
         }
 
-        public struct CropLocation
+        [TypeConverter(typeof(CropLocationTypeConverter))]
+        public struct CropLocation : IEquatable<CropLocation>
         {
             public string LocationName { get; set; }
             public int TileX { get; set; }
             public int TileY { get; set; }
+
+            /// <summary>
+            /// Parses a string representation of CropLocation back to CropLocation struct
+            /// </summary>
+            /// <param name="value">String in format "LocationName|TileX|TileY"</param>
+            /// <returns>CropLocation struct</returns>
+            public static CropLocation Parse(string value)
+            {
+                if (string.IsNullOrEmpty(value))
+                    throw new ArgumentException("Value cannot be null or empty", nameof(value));
+
+                var parts = value.Split('|');
+                if (parts.Length != 3)
+                    throw new FormatException($"Invalid CropLocation format: {value}. Expected format: LocationName|TileX|TileY");
+
+                if (!int.TryParse(parts[1], out int tileX))
+                    throw new FormatException($"Invalid TileX value: {parts[1]}");
+
+                if (!int.TryParse(parts[2], out int tileY))
+                    throw new FormatException($"Invalid TileY value: {parts[2]}");
+
+                return new CropLocation
+                {
+                    LocationName = parts[0],
+                    TileX = tileX,
+                    TileY = tileY
+                };
+            }
+
+            /// <summary>
+            /// Converts CropLocation to string representation
+            /// </summary>
+            /// <returns>String in format "LocationName|TileX|TileY"</returns>
+            public override string ToString()
+            {
+                return $"{LocationName ?? ""}|{TileX}|{TileY}";
+            }
+
+            /// <summary>
+            /// Checks equality with another CropLocation
+            /// </summary>
+            public bool Equals(CropLocation other)
+            {
+                return LocationName == other.LocationName && TileX == other.TileX && TileY == other.TileY;
+            }
+
+            /// <summary>
+            /// Checks equality with another object
+            /// </summary>
+            public override bool Equals(object obj)
+            {
+                return obj is CropLocation other && Equals(other);
+            }
+
+            /// <summary>
+            /// Gets hash code for the CropLocation
+            /// </summary>
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(LocationName, TileX, TileY);
+            }
+
+            /// <summary>
+            /// Equality operator
+            /// </summary>
+            public static bool operator ==(CropLocation left, CropLocation right)
+            {
+                return left.Equals(right);
+            }
+
+            /// <summary>
+            /// Inequality operator
+            /// </summary>
+            public static bool operator !=(CropLocation left, CropLocation right)
+            {
+                return !left.Equals(right);
+            }
         }
 
         public struct CropGrowthStage
@@ -81,8 +195,8 @@ namespace DedicatedServer.Crops
             {
                 CropSaveData cropSaveData = helper.Data.ReadSaveData<CropSaveData>("AdditionalCropData") ?? new CropSaveData
                 {
-                    cropDictionary = new SerializableDictionary<CropLocation, CropData>(),
-                    beginningOfDayCrops = new SerializableDictionary<CropLocation, CropComparisonData>()
+                    cropDictionary = new SerializableDictionary<string, CropData>(),
+                    beginningOfDayCrops = new SerializableDictionary<string, CropComparisonData>()
                 };
                 
                 beginningOfDayCrops = cropSaveData.beginningOfDayCrops;
@@ -92,8 +206,8 @@ namespace DedicatedServer.Crops
             {
                 monitor.Log($"Error loading crop data: {ex.Message}", LogLevel.Warn);
                 // Initialize empty dictionaries if loading fails
-                beginningOfDayCrops = new SerializableDictionary<CropLocation, CropComparisonData>();
-                cropDictionary = new SerializableDictionary<CropLocation, CropData>();
+                beginningOfDayCrops = new SerializableDictionary<string, CropComparisonData>();
+                cropDictionary = new SerializableDictionary<string, CropData>();
             }
         }
 
@@ -192,6 +306,7 @@ namespace DedicatedServer.Crops
                                 // Mark it as found via the locationSet, so we know not to remove
                                 // the corresponding cropDictionary entry if one exists
                                 locationSet.Add(cropLocation);
+                                string cropLocationKey = cropLocation.ToString();
 
                                 // Construct its growth stage so we can compare it to beginningOfDayCrops
                                 // to see if it was newly-planted.
@@ -215,7 +330,7 @@ namespace DedicatedServer.Crops
 
                                 // Determine if this crop was planted today or was pre-existing, based on whether
                                 // or not it's different from the crop at this location at the beginning of the day.
-                                if (!beginningOfDayCrops.ContainsKey(cropLocation) || !sameCrop(beginningOfDayCrops[cropLocation], cropComparisonData))
+                                if (!beginningOfDayCrops.ContainsKey(cropLocationKey) || !sameCrop(beginningOfDayCrops[cropLocationKey], cropComparisonData))
                                 {
                                     // No crop was found at this location at the beginning of the day, or the comparison data
                                     // is different. Consider it a new crop, and add a new CropData for it in the cropDictionary.
@@ -227,7 +342,7 @@ namespace DedicatedServer.Crops
                                         OriginalRegrowAfterHarvest = crop.GetData()?.RegrowDays ?? -1,
                                         HarvestableLastNight = false
                                     };
-                                    cropDictionary[cropLocation] = cd;
+                                    cropDictionary[cropLocationKey] = cd;
 
                                     // TODO: In Stardew Valley 1.6+, crop seasons are read-only data from Data/Crops
                                     // and cannot be modified directly. The old logic here tried to make crops survive
@@ -246,7 +361,7 @@ namespace DedicatedServer.Crops
                                 // in the last phase, AND it's either a) NOT marked as "fully grown" (i.e., it hasn't been harvested
                                 // at least once), or b) has a non-positive current day of phase (after harvest and regrowth,
                                 // the current day of phase is set to positive and then works downward; 0 means ready-for-reharvest).
-                                if (cropDictionary.TryGetValue(cropLocation, out var cropData))
+                                if (cropDictionary.TryGetValue(cropLocationKey, out var cropData))
                                 {
                                     if ((crop.phaseDays.Count > 0 && crop.currentPhase.Value < crop.phaseDays.Count - 1) || (crop.dayOfCurrentPhase.Value > 0 && crop.fullyGrown.Value))
                                     {
@@ -255,7 +370,7 @@ namespace DedicatedServer.Crops
                                     {
                                         cropData.HarvestableLastNight = true;
                                     }
-                                    cropDictionary[cropLocation] = cropData;
+                                    cropDictionary[cropLocationKey] = cropData;
                                 }
                             }
                         }
@@ -266,17 +381,19 @@ namespace DedicatedServer.Crops
             // Lastly, if there were any CropLocations in the cropDictionary that we DIDN'T see throughout the entire
             // iteration, then they must've been destroyed, AND they weren't replaced with a new crop at the same location.
             // In such a case, we can remove it from the cropDictionary.
-            var locationSetComplement = new HashSet<CropLocation>();
+            var locationSetComplement = new HashSet<string>();
             foreach (var kvp in cropDictionary)
             {
-                if (!locationSet.Contains(kvp.Key))
+                // Parse the string key back to CropLocation to check if it exists in locationSet
+                var cropLocation = CropLocation.Parse(kvp.Key);
+                if (!locationSet.Contains(cropLocation))
                 {
                     locationSetComplement.Add(kvp.Key);
                 }
             }
-            foreach (var cropLocation in locationSetComplement)
+            foreach (var cropLocationKey in locationSetComplement)
             {
-                cropDictionary.Remove(cropLocation);
+                cropDictionary.Remove(cropLocationKey);
             }
         }
 
@@ -285,7 +402,7 @@ namespace DedicatedServer.Crops
             beginningOfDayCrops.Clear();
             foreach (var location in Game1.locations)
             {
-                if (location.IsOutdoors && !location.SeedsIgnoreSeasonsHere() && location is not IslandLocation)
+                if (location.IsOutdoors && !location.SeedsIgnoreSeasonsHere() && !(location is IslandLocation))
                 {
                     // Found an outdoor location where seeds don't ignore seasons. Find all the
                     // crops here to cache necessary data for protecting them.
@@ -305,6 +422,7 @@ namespace DedicatedServer.Crops
                                     TileX = (int) tileLocation.X,
                                     TileY = (int) tileLocation.Y
                                 };
+                                string cropLocationKey = cropLocation.ToString();
 
                                 CropData cropData;
                                 CropComparisonData cropComparisonData;
@@ -312,7 +430,7 @@ namespace DedicatedServer.Crops
                                 // in the cropDictionary. Firstly, check if such a CropData entry exists
                                 // (it won't exist for auto-spawned crops, like spring onion, since they'll
                                 // never have passed the previous "newly planted test")
-                                if (!cropDictionary.TryGetValue(cropLocation, out cropData))
+                                if (!cropDictionary.TryGetValue(cropLocationKey, out cropData))
                                 {
                                     // The crop was not planted by the player. However, we do want to
                                     // record its comparison information so that we can check this evening
@@ -337,7 +455,7 @@ namespace DedicatedServer.Crops
                                     WhichForageCrop = int.TryParse(crop.whichForageCrop.Value, out int forageCrop2) ? forageCrop2 : 0
                                 };
 
-                                    beginningOfDayCrops[cropLocation] = cropComparisonData;
+                                    beginningOfDayCrops[cropLocationKey] = cropComparisonData;
 
                                     // Now move on to the next crop; we don't want to mess with this one.
                                     continue;
@@ -382,7 +500,7 @@ namespace DedicatedServer.Crops
                                 }
 
                                 // Update the crop data in the crop dictionary
-                                cropDictionary[cropLocation] = cropData;
+                                cropDictionary[cropLocationKey] = cropData;
 
                                 // Lastly, now that the crop has been updated, construct the comparison data for later
                                 // so that we can check if this has been replaced by a newly planted crop in the evening.
@@ -404,7 +522,7 @@ namespace DedicatedServer.Crops
                                     WhichForageCrop = int.TryParse(crop.whichForageCrop.Value, out int forageCrop3) ? forageCrop3 : 0
                                 };
 
-                                beginningOfDayCrops[cropLocation] = cropComparisonData;
+                                beginningOfDayCrops[cropLocationKey] = cropComparisonData;
                             }
                         }
                     }

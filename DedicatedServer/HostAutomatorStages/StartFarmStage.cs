@@ -58,7 +58,7 @@ namespace DedicatedServer.HostAutomatorStages
 
         public override void Execute(object sender, UpdateTickedEventArgs e)
         {
-            if (Game1.activeClickableMenu is not TitleMenu menu)
+            if (!(Game1.activeClickableMenu is TitleMenu menu))
             {
                 return;
             }

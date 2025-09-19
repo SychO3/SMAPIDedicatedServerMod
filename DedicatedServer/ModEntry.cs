@@ -1,4 +1,5 @@
 ﻿using DedicatedServer.Config;
+using DedicatedServer.ConsoleCommands;
 using DedicatedServer.HostAutomatorStages;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -26,6 +27,7 @@ namespace DedicatedServer
         private WaitCondition titleMenuWaitCondition;
         private ModConfig config;
         private IModHelper helper;
+        private TimeControlCommand timeControlCommand;
 
         /*********
         ** Public methods
@@ -36,6 +38,10 @@ namespace DedicatedServer
         {
             this.helper = helper;
             this.config = helper.ReadConfig<ModConfig>();
+
+            // 初始化并注册时间控制命令
+            this.timeControlCommand = new TimeControlCommand(helper, Monitor);
+            this.timeControlCommand.RegisterCommands();
 
             // Ensure that the game environment is in a stable state before the mod starts executing
             // Without a waiting time, an invitation code is almost never generated; with a waiting
