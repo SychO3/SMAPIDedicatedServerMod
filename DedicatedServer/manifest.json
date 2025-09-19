@@ -1,9 +1,9 @@
 {
   "Name": "DedicatedServer",
-  "Author": "ObjectManagerManager",
-  "Version": "1.0.2",
-  "Description": "Description",
-  "UniqueID": "objectmanagermanager.DedicatedServer",
+  "Author": "sycho3",
+  "Version": "2.0.0",
+  "Description": "Helper tools for Stardew Valley multiplayer.",
+  "UniqueID": "sycho3.DedicatedServer",
   "EntryDll": "DedicatedServer.dll",
   "MinimumApiVersion": "3.0.0",
   "UpdateKeys": []
