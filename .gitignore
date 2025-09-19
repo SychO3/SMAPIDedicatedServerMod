@@ -55,7 +55,7 @@ nunit-*.xml
 
 # Other
 .idea/
-apis_en
-.config/
-.windsurf/
-.cursor/
+#apis_en
+#.config/
+#.windsurf/
+#.cursor/

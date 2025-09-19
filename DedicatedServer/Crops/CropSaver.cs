@@ -5,9 +5,7 @@ using StardewValley.Locations;
 using StardewValley.TerrainFeatures;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Xml.Serialization;
 
 namespace DedicatedServer.Crops
 {
@@ -18,12 +16,11 @@ namespace DedicatedServer.Crops
         private ModConfig config;
         private SerializableDictionary<CropLocation, CropData> cropDictionary = new SerializableDictionary<CropLocation, CropData>();
         private SerializableDictionary<CropLocation, CropComparisonData> beginningOfDayCrops = new SerializableDictionary<CropLocation, CropComparisonData>();
-        private XmlSerializer cropSaveDataSerializer = new XmlSerializer(typeof(CropSaveData));
 
-        public struct CropSaveData
+        public class CropSaveData
         {
-            public SerializableDictionary<CropLocation, CropData> cropDictionary { get; set; }
-            public SerializableDictionary<CropLocation, CropComparisonData> beginningOfDayCrops { get; set; }
+            public SerializableDictionary<CropLocation, CropData> cropDictionary { get; set; } = new SerializableDictionary<CropLocation, CropData>();
+            public SerializableDictionary<CropLocation, CropComparisonData> beginningOfDayCrops { get; set; } = new SerializableDictionary<CropLocation, CropComparisonData>();
         }
 
         public struct CropLocation
@@ -78,109 +75,50 @@ namespace DedicatedServer.Crops
         private void onLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
         {
             /**
-             * Loads the cropDictionary and beginningOfDayCrops.
+             * Loads the cropDictionary and beginningOfDayCrops using SMAPI's data API.
              */
-            string str = SaveGame.FilterFileName(Game1.GetSaveGameName());
-            string filenameNoTmpString = str + "_" + Game1.uniqueIDForThisGame;
-            string save_directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StardewValley", "Saves", filenameNoTmpString + Path.DirectorySeparatorChar);
-            if (Game1.savePathOverride != "")
-            {
-                save_directory = Game1.savePathOverride;
-            }
-            string saveFile = Path.Combine(save_directory, "AdditionalCropData");
-
-            // Deserialize crop data from temp save file
-            Stream fstream = null;
             try
             {
-                fstream = new FileStream(saveFile, FileMode.Open);
-                CropSaveData cropSaveData = (CropSaveData)cropSaveDataSerializer.Deserialize(fstream);
-                fstream.Close();
+                CropSaveData cropSaveData = helper.Data.ReadSaveData<CropSaveData>("AdditionalCropData") ?? new CropSaveData
+                {
+                    cropDictionary = new SerializableDictionary<CropLocation, CropData>(),
+                    beginningOfDayCrops = new SerializableDictionary<CropLocation, CropComparisonData>()
+                };
+                
                 beginningOfDayCrops = cropSaveData.beginningOfDayCrops;
                 cropDictionary = cropSaveData.cropDictionary;
-            } catch (IOException)
+            }
+            catch (Exception ex)
             {
-                fstream?.Close();
+                monitor.Log($"Error loading crop data: {ex.Message}", LogLevel.Warn);
+                // Initialize empty dictionaries if loading fails
+                beginningOfDayCrops = new SerializableDictionary<CropLocation, CropComparisonData>();
+                cropDictionary = new SerializableDictionary<CropLocation, CropData>();
             }
         }
 
         private void onSaving(object sender, StardewModdingAPI.Events.SavingEventArgs e)
         {
             /**
-             * Saves the cropDictionary and beginningOfDayCrops. In most cases, the day is started
-             * immediately after loading, which in-turn clears beginningOfDayCrops. However, in case
-             * some other mod is installed which allows mid-day saving and loading, it's a good idea
-             * to save both dictionaries anyways.
+             * Saves the cropDictionary and beginningOfDayCrops using SMAPI's data API.
+             * In most cases, the day is started immediately after loading, which in-turn 
+             * clears beginningOfDayCrops. However, in case some other mod is installed 
+             * which allows mid-day saving and loading, it's a good idea to save both 
+             * dictionaries anyways.
              */
-
-            // Determine save paths
-            string tmpString = "_STARDEWVALLEYSAVETMP";
-            bool save_backups_and_metadata = true;
-            string str = SaveGame.FilterFileName(Game1.GetSaveGameName());
-            string filenameNoTmpString = str + "_" + Game1.uniqueIDForThisGame;
-            string filenameWithTmpString = str + "_" + Game1.uniqueIDForThisGame + tmpString;
-            string save_directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "StardewValley", "Saves", filenameNoTmpString + Path.DirectorySeparatorChar);
-            if (Game1.savePathOverride != "")
-            {
-                save_directory = Game1.savePathOverride;
-                if (Game1.savePathOverride != "")
-                {
-                    save_backups_and_metadata = false;
-                }
-            }
-            SaveGame.ensureFolderStructureExists();
-            string tmpSaveFile = Path.Combine(save_directory, "AdditionalCropData" + tmpString);
-            string saveFile = Path.Combine(save_directory, "AdditionalCropData");
-            string backupSaveFile = Path.Combine(save_directory, "AdditionalCropData_old");
-
-            // Serialize crop data to temp save file
-            TextWriter writer = null;
             try
             {
-                writer = new StreamWriter(tmpSaveFile);
+                var cropSaveData = new CropSaveData 
+                { 
+                    cropDictionary = cropDictionary, 
+                    beginningOfDayCrops = beginningOfDayCrops 
+                };
+                
+                helper.Data.WriteSaveData("AdditionalCropData", cropSaveData);
             }
-            catch (IOException)
+            catch (Exception ex)
             {
-                writer?.Close();
-            }
-
-            cropSaveDataSerializer.Serialize(writer, new CropSaveData {cropDictionary = cropDictionary, beginningOfDayCrops = beginningOfDayCrops});
-            writer.Close();
-
-            // If appropriate, move old crop data file to backup
-            if (save_backups_and_metadata)
-            {
-                try
-                {
-                    if (File.Exists(backupSaveFile))
-                    {
-                        File.Delete(backupSaveFile);
-                    }
-                }
-                catch (Exception) {}
-
-                try
-                {
-                    File.Move(saveFile, backupSaveFile);
-                }
-                catch (Exception) {}
-            }
-
-            // Delete previous save file if it still exists (hasn't been moved to
-            // backup)
-            if (File.Exists(saveFile))
-            {
-                File.Delete(saveFile);
-            }
-
-            // Move new temp save file to non-temp save file
-            try
-            {
-                File.Move(tmpSaveFile, saveFile);
-            }
-            catch (IOException ex)
-            {
-                Game1.debugOutput = Game1.parseText(ex.Message);
+                monitor.Log($"Error saving crop data: {ex.Message}", LogLevel.Error);
             }
         }
 
