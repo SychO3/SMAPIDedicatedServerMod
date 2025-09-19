@@ -38,6 +38,11 @@ Upon running SMAPI with the mod installed for the first time, a `config.json` fi
 
 - `MoveBuildPermission`: Changes farmhands permissions to move buildings from the Carpenter's shop. Is set each time the server is started and can be changed in the game. Set to `off` to entirely disable moving buildings, set to `owned` to allow farmhands to move buildings that they purchased, or set to `on` to allow moving all buildings.
 
+### Inactive Player Management
+
+- `EnableInactivePlayerKick`: Set to `true` or `false` to enable or disable automatic kicking of inactive players. Defaults to `true`.
+- `InactiveKickTimeMinutes`: The time in minutes after which inactive players will be kicked from the server. Defaults to `30` minutes.
+
 ## In Game Command
 
 All commands in the game must be sent privately to the player `ServerBot`. For example, you must write the following `/message ServerBot MoveBuildPermission on`:
@@ -62,6 +67,15 @@ Changes farmhands permissions to move buildings from the Carpenter's shop. Set t
 All these commands only work if you are the host. This allows you to take control of the server. The host sends the commands by entering them directly, without anything before or after:
 
 - `LetMePlay`: Lets the player take over the host. All host functions are switched off. The `TakeOver` command must be entered to hand over the controller.
+
+## Console Commands
+
+These commands can be entered in the SMAPI console:
+
+- `kick_status`: Display the activity status of all connected players and their remaining time before being kicked.
+- `kick_enable`: Enable the inactive player kick feature.
+- `kick_disable`: Disable the inactive player kick feature.
+- `kick_timeout <minutes>`: Set the inactive kick timeout in minutes (must be a positive integer).
 
 ## Running the Server on Linux Without GUI
 

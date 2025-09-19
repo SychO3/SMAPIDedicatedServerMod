@@ -1,6 +1,7 @@
 ﻿using DedicatedServer.Config;
 using DedicatedServer.ConsoleCommands;
 using DedicatedServer.HostAutomatorStages;
+using DedicatedServer.Utils;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -28,6 +29,7 @@ namespace DedicatedServer
         private ModConfig config;
         private IModHelper helper;
         private TimeControlCommand timeControlCommand;
+        private InactivePlayerKicker inactivePlayerKicker;
 
         /*********
         ** Public methods
@@ -42,6 +44,55 @@ namespace DedicatedServer
             // 初始化并注册时间控制命令
             this.timeControlCommand = new TimeControlCommand(helper, Monitor);
             this.timeControlCommand.RegisterCommands();
+
+            // 初始化不活跃玩家踢出功能
+            this.inactivePlayerKicker = new InactivePlayerKicker(helper, Monitor, config);
+            
+            // 注册控制台命令
+            helper.ConsoleCommands.Add("kick_status", "显示玩家活动状态", (command, args) =>
+            {
+                inactivePlayerKicker.ShowPlayerStatus();
+            });
+
+            helper.ConsoleCommands.Add("kick_enable", "启用不活跃玩家踢出功能", (command, args) =>
+            {
+                config.EnableInactivePlayerKick = true;
+                helper.WriteConfig(config);
+                inactivePlayerKicker.Disable();
+                inactivePlayerKicker = new InactivePlayerKicker(helper, Monitor, config);
+                inactivePlayerKicker.Enable();
+                Monitor.Log("不活跃玩家踢出功能已启用", LogLevel.Info);
+            });
+
+            helper.ConsoleCommands.Add("kick_disable", "禁用不活跃玩家踢出功能", (command, args) =>
+            {
+                config.EnableInactivePlayerKick = false;
+                helper.WriteConfig(config);
+                inactivePlayerKicker.Disable();
+                Monitor.Log("不活跃玩家踢出功能已禁用", LogLevel.Info);
+            });
+
+            helper.ConsoleCommands.Add("kick_timeout", "设置不活跃踢出时间(分钟) - 用法: kick_timeout <分钟>", (command, args) =>
+            {
+                if (args.Length != 1 || !int.TryParse(args[0], out int minutes) || minutes <= 0)
+                {
+                    Monitor.Log("用法: kick_timeout <分钟> (必须是正整数)", LogLevel.Info);
+                    return;
+                }
+
+                config.InactiveKickTimeMinutes = minutes;
+                helper.WriteConfig(config);
+                
+                // 重新初始化以应用新设置
+                inactivePlayerKicker.Disable();
+                inactivePlayerKicker = new InactivePlayerKicker(helper, Monitor, config);
+                if (config.EnableInactivePlayerKick)
+                {
+                    inactivePlayerKicker.Enable();
+                }
+                
+                Monitor.Log($"不活跃踢出时间已设置为 {minutes} 分钟", LogLevel.Info);
+            });
 
             // Ensure that the game environment is in a stable state before the mod starts executing
             // Without a waiting time, an invitation code is almost never generated; with a waiting
@@ -62,6 +113,9 @@ namespace DedicatedServer
             {
                 helper.Events.GameLoop.UpdateTicked -= OnUpdateTicked;
                 new StartFarmStage(this.Helper, Monitor, config).Enable();
+                
+                // 启用不活跃玩家踢出功能
+                inactivePlayerKicker.Enable();
             }
         }
 

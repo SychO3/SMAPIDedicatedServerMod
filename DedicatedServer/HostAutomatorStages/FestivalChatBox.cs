@@ -10,7 +10,7 @@ namespace DedicatedServer.HostAutomatorStages
 {
     internal class FestivalChatBox
     {
-        private const string entryMessage = "When you wish to start the festival, type \"start\" into chat. If you'd like to cancel your vote, type \"cancel\".";
+        private const string entryMessage = "当您希望开始节日活动时，请在聊天中输入\"开始\"。如果您想取消投票，请输入\"取消\"。";
 
         private EventDrivenChatBox chatBox;
         private IDictionary<long, Farmer> otherPlayers;
@@ -56,11 +56,11 @@ namespace DedicatedServer.HostAutomatorStages
                 return;
             }
 
-            if (e.Message.ToLower() == "start")
+            if (e.Message.ToLower() == "开始")
             {
                 votes.Add(e.SourceFarmerId);
             }
-            else if (e.Message.ToLower() == "cancel")
+            else if (e.Message.ToLower() == "取消")
             {
                 votes.Remove(e.SourceFarmerId);
             }

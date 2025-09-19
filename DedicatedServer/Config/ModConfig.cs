@@ -60,5 +60,11 @@ namespace DedicatedServer.Config
         // "owned" to allow farmhands to move buildings that they purchased.
         // "on" to allow moving all buildings.
         public string MoveBuildPermission { get; set; } = "off";
+
+        // 自动踢出不活跃玩家的功能
+        public bool EnableInactivePlayerKick { get; set; } = true;
+
+        // 不活跃玩家踢出时间（分钟）
+        public int InactiveKickTimeMinutes { get; set; } = 5;
     }
 }

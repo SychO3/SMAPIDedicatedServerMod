@@ -1,4 +1,4 @@
-﻿using StardewValley;
+using StardewValley;
 using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
