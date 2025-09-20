@@ -33,7 +33,22 @@ namespace DedicatedServer.Utils
         }
         public static bool ShouldAttend(int numOtherPlayers)
         {
-            return numOtherPlayers > 0 && OthersWaitingToAttend(numOtherPlayers) && Utility.isFestivalDay(Game1.dayOfMonth, Game1.season) && !isTodayBeachNightMarket() && Game1.timeOfDay >= Utility.getStartTimeOfFestival() && Game1.timeOfDay <= getFestivalEndTime();
+            bool isFestivalDay = Utility.isFestivalDay(Game1.dayOfMonth, Game1.season);
+            bool hasOtherPlayers = numOtherPlayers > 0;
+            bool othersWaiting = OthersWaitingToAttend(numOtherPlayers);
+            bool isBeachNightMarket = isTodayBeachNightMarket();
+            bool isTimeCorrect = Game1.timeOfDay >= Utility.getStartTimeOfFestival() && Game1.timeOfDay <= getFestivalEndTime();
+            
+            bool shouldAttend = hasOtherPlayers && othersWaiting && isFestivalDay && !isBeachNightMarket && isTimeCorrect;
+            
+            // 暂时注释掉详细日志，避免编译错误
+            // if (isFestivalDay && hasOtherPlayers)
+            // {
+            //     // 只在节日当天且有其他玩家时记录详细信息
+            //     Monitor?.Log($"节日判断: 节日日期={isFestivalDay}, 有其他玩家={hasOtherPlayers}, 其他玩家等待={othersWaiting}, 海滩夜市={isBeachNightMarket}, 时间正确={isTimeCorrect}, 应参加={shouldAttend}", StardewModdingAPI.LogLevel.Debug);
+            // }
+            
+            return shouldAttend;
         }
 
         public static bool IsWaitingToLeave()

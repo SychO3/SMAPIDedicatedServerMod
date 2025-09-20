@@ -4,7 +4,6 @@ using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -18,6 +17,21 @@ namespace DedicatedServer.HostAutomatorStages
 
         public override void Process(BehaviorState state)
         {
+            // 首先检查是否应该处理节日主活动（模仿dsa文件的处理逻辑）
+            if (state.ShouldProcessFestivalMainEvent())
+            {
+                if (state.ShouldTriggerFestivalMainEvent())
+                {
+                    // 等待时间到了，触发节日主活动
+                    state.LogDebug("节日流程: 节日事件已就绪，触发Lewis对话开始主活动");
+                    Game1.CurrentEvent.answerDialogueQuestion(Game1.getCharacterFromName("Lewis"), "yes");
+                    state.DisableFestivalMainEvent();
+                }
+                // 如果还在等待，直接返回不处理投票
+                processNext(state);
+                return;
+            }
+            
             Tuple<int, int> voteCounts = state.UpdateFestivalStartVotes();
             if (voteCounts != null)
             {
@@ -37,7 +51,11 @@ namespace DedicatedServer.HostAutomatorStages
                         // anyways. So just duplicate the first element with Item.getOne().
                         Game1.player.team.luauIngredients.Add(Game1.player.team.luauIngredients[0].getOne());
                     }
-                    Game1.CurrentEvent.answerDialogueQuestion(null, "yes");
+                    
+                    // 模仿dsa文件的模式：不立即调用answerDialogueQuestion，而是启用等待状态
+                    state.LogDebug("节日流程: 投票完成，启用节日主活动等待状态");
+                    state.SendChatMessage("投票完成，等待节日事件准备就绪...");
+                    state.EnableFestivalMainEvent();
                     state.DisableFestivalChatBox();
                 }
                 else

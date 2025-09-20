@@ -43,6 +43,10 @@ Upon running SMAPI with the mod installed for the first time, a `config.json` fi
 - `EnableInactivePlayerKick`: Set to `true` or `false` to enable or disable automatic kicking of inactive players. Defaults to `true`.
 - `InactiveKickTimeMinutes`: The time in minutes after which inactive players will be kicked from the server. Defaults to `30` minutes.
 
+### Festival Management
+
+When festivals occur, the server requires players to vote to start the festival activities. Players with SMAPI installed can vote by typing "开始" (start) or "取消" (cancel) in chat. **Mobile players (who typically don't have SMAPI) are automatically considered as agreeing to start festivals**, ensuring the game can continue without interruption for all players.
+
 ## In Game Command
 
 All commands in the game must be sent privately to the player `ServerBot`. For example, you must write the following `/message ServerBot MoveBuildPermission on`:

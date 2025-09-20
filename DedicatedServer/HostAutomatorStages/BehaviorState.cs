@@ -30,11 +30,16 @@ namespace DedicatedServer.HostAutomatorStages
         private IDictionary<long, Farmer> otherPlayers = new Dictionary<long, Farmer>();
         private IMonitor monitor;
         private FestivalChatBox festivalChatBox;
+        private bool hasLoggedFestivalChatBoxCheck = false; // 防止无限刷屏的标志
+        
+        // 节日主活动状态管理（模仿dsa文件的模式）
+        private bool festivalMainEventAvailable = false;
+        private int festivalMainEventCountDown = 0;
 
-        public BehaviorState(IMonitor monitor, EventDrivenChatBox chatBox)
+        public BehaviorState(IMonitor monitor, EventDrivenChatBox chatBox, IModHelper helper)
         {
             this.monitor = monitor;
-            festivalChatBox = new FestivalChatBox(chatBox, otherPlayers);
+            festivalChatBox = new FestivalChatBox(chatBox, otherPlayers, helper);
         }
 
         public bool HasBetweenEventsWaitTicks()
@@ -192,32 +197,96 @@ namespace DedicatedServer.HostAutomatorStages
         
         public Tuple<int, int> UpdateFestivalStartVotes()
         {
-            if (festivalChatBox.IsEnabled())
+            if (festivalChatBox != null && festivalChatBox.IsEnabled())
             {
+                // 只在第一次检查时打印日志，避免无限刷屏
+                if (!hasLoggedFestivalChatBoxCheck)
+                {
+                    monitor?.Log("节日流程: 检查节日投票状态...", StardewModdingAPI.LogLevel.Info);
+                    hasLoggedFestivalChatBoxCheck = true;
+                }
+                
                 int numFestivalStartVotes = festivalChatBox.NumVoted();
                 if (numFestivalStartVotes != this.numFestivalStartVotes || otherPlayers.Count != numFestivalStartVotesRequired)
                 {
                     this.numFestivalStartVotes = numFestivalStartVotes;
                     numFestivalStartVotesRequired = otherPlayers.Count;
+                    monitor?.Log($"节日流程: 投票数变化 - {numFestivalStartVotes}/{numFestivalStartVotesRequired}", StardewModdingAPI.LogLevel.Info);
                     return Tuple.Create(numFestivalStartVotes, numFestivalStartVotesRequired);
                 }
+                
             }
             return null;
         }
 
         public void EnableFestivalChatBox()
         {
-            festivalChatBox.Enable();
-            numFestivalStartVotes = 0;
-            numFestivalStartVotesRequired = otherPlayers.Count;
+            if (festivalChatBox != null)
+            {
+                festivalChatBox.Enable();
+                // 重置投票数为0，让第一次检查时能检测到变化
+                numFestivalStartVotes = 0;
+                numFestivalStartVotesRequired = otherPlayers.Count;
+                hasLoggedFestivalChatBoxCheck = false; // 重置日志标志
+                monitor?.Log($"节日流程: 投票聊天框已启用 - 玩家数: {numFestivalStartVotesRequired}", StardewModdingAPI.LogLevel.Info);
+            }
         }
         public void DisableFestivalChatBox()
         {
-            festivalChatBox.Disable();
+            if (festivalChatBox != null)
+            {
+                festivalChatBox.Disable();
+                monitor?.Log("节日流程: 投票聊天框已禁用", StardewModdingAPI.LogLevel.Info);
+            }
         }
         public void SendChatMessage(string message)
         {
-            festivalChatBox.SendChatMessage(message);
+            if (festivalChatBox != null)
+            {
+                festivalChatBox.SendChatMessage(message);
+            }
+        }
+
+        public bool IsFestivalChatBoxEnabled()
+        {
+            return festivalChatBox != null && festivalChatBox.IsEnabled();
+        }
+        
+        // 节日主活动状态管理方法（模仿dsa文件）
+        public void EnableFestivalMainEvent()
+        {
+            festivalMainEventAvailable = true;
+            festivalMainEventCountDown = 0;
+            monitor?.Log("节日流程: 启用节日主活动等待状态", StardewModdingAPI.LogLevel.Info);
+        }
+        
+        public bool ShouldProcessFestivalMainEvent()
+        {
+            // 检查是否应该处理节日主活动（模仿dsa的条件检查）
+            return festivalMainEventAvailable && Game1.CurrentEvent != null && Game1.CurrentEvent.isFestival;
+        }
+        
+        public bool ShouldTriggerFestivalMainEvent()
+        {
+            // 增加倒计时，在倒计时结束后触发主活动
+            if (ShouldProcessFestivalMainEvent())
+            {
+                festivalMainEventCountDown += 1;
+                
+                // 等待3秒后触发主活动（模仿dsa的延迟）
+                if (festivalMainEventCountDown >= 180) // 60fps * 3秒 = 180帧
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
+        public void DisableFestivalMainEvent()
+        {
+            festivalMainEventAvailable = false;
+            festivalMainEventCountDown = 0;
+            monitor?.Log("节日流程: 禁用节日主活动状态", StardewModdingAPI.LogLevel.Info);
         }
 
         public int GetNumOtherPlayers()
@@ -262,6 +331,11 @@ namespace DedicatedServer.HostAutomatorStages
             waitTicks = startOfDayWaitTicks;
             numFestivalStartVotes = 0;
             numFestivalStartVotesRequired = otherPlayers.Count;
+            hasLoggedFestivalChatBoxCheck = false; // 重置日志标志
+            
+            // 重置节日主活动状态
+            festivalMainEventAvailable = false;
+            festivalMainEventCountDown = 0;
         }
     }
 }
