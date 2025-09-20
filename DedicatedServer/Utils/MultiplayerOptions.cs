@@ -303,12 +303,13 @@ namespace DedicatedServer.Utils
                     {
                         tryActivatingState = TryActivatingStates.DisableServer;
                     }
-                    chatBox.textBoxEnter($"Attention: Server will shut down in {time} seconds" + TextColor.Yellow);
+                    chatBox.textBoxEnter($"正在尝试获取邀请码，剩余时间 {time} 秒" + TextColor.Yellow);
                     break;
 
                 case TryActivatingStates.DisableServer:
                     time = tryActivatingWaitTimes[1];
                     EnableServer = false;
+                    chatBox.textBoxEnter("邀请码初次获取失败，正在重启服务器功能以重新尝试..." + TextColor.Orange);
                     tryActivatingState = TryActivatingStates.WaitUntilActivation;
                     break;
 
@@ -317,13 +318,14 @@ namespace DedicatedServer.Utils
                     {
                         tryActivatingState = TryActivatingStates.EnableServer;
                     }
-                    chatBox.textBoxEnter($"Attention: The server is started in {time} seconds" + TextColor.Yellow);
+                    chatBox.textBoxEnter($"邀请码获取失败，将在 {time} 秒后重启服务器功能" + TextColor.Yellow);
                     break;
 
                 case TryActivatingStates.EnableServer:
                     time = tryActivatingWaitTimes[2];
                     tryActivatingState = TryActivatingStates.WaitForNewInviteCode;
                     EnableServer = true;
+                    chatBox.textBoxEnter("服务器功能已重启，正在重新尝试获取邀请码..." + TextColor.Green);
                     break;
 
                 case TryActivatingStates.WaitForNewInviteCode:
@@ -331,16 +333,20 @@ namespace DedicatedServer.Utils
                     {
                         SaveInviteCode();
                         tryActivatingState = TryActivatingStates.None;
-                        // chatBox.textBoxEnter($"Could receive the invitation code {InviteCode}" + TextColor.Green);
+                         // chatBox.textBoxEnter($"邀请码获取成功：{InviteCode}" + TextColor.Green);
                         return;
                     }
                     if (0 == time)
                     {
                         tryActivatingState = TryActivatingStates.None;
-                        // chatBox.textBoxEnter($"Attention: Invitation code could not be retrieved" + TextColor.Red);
+                        chatBox.textBoxEnter("注意：无法获取邀请码，请检查网络连接或手动获取" + TextColor.Red);
                         return;
                     }
-                    // chatBox.textBoxEnter($"Attention: Try to get the invitation code, remaining time {time} seconds" + TextColor.Yellow);
+                    // 可选：显示获取邀请码的进度（每5秒显示一次）
+                    if (time % 5 == 0 || time <= 3)
+                    {
+                        chatBox.textBoxEnter($"正在重新尝试获取邀请码，剩余时间 {time} 秒" + TextColor.Yellow);
+                    }
                     break;
             }
         }

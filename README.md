@@ -47,6 +47,19 @@ Upon running SMAPI with the mod installed for the first time, a `config.json` fi
 
 When festivals occur, the server requires players to vote to start the festival activities. Players with SMAPI installed can vote by typing "开始" (start) or "取消" (cancel) in chat. **Mobile players (who typically don't have SMAPI) are automatically considered as agreeing to start festivals**, ensuring the game can continue without interruption for all players.
 
+### Invite Code Generation Process
+
+When the server starts, it automatically attempts to generate and retrieve a multiplayer invite code. This process may involve the following messages that are **completely normal**:
+
+- `正在尝试获取邀请码，剩余时间 X 秒` - First attempt to get the invite code (9 seconds)
+- `邀请码初次获取失败，正在重启服务器功能以重新尝试...` - If first attempt fails, server functions are temporarily restarted
+- `邀请码获取失败，将在 X 秒后重启服务器功能` - Countdown before restarting (3 seconds)  
+- `服务器功能已重启，正在重新尝试获取邀请码...` - Server functions restarted, making second attempt
+- `邀请码获取成功：XXXXXX` - Success message with the actual invite code
+- `注意：无法获取邀请码，请检查网络连接或手动获取` - If all attempts fail
+
+**Important**: These messages do NOT indicate a server shutdown or error - they are part of the normal invite code generation process designed to ensure reliable multiplayer functionality.
+
 ## In Game Command
 
 All commands in the game must be sent privately to the player `ServerBot`. For example, you must write the following `/message ServerBot MoveBuildPermission on`:
